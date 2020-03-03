@@ -2,11 +2,11 @@ package main
 
 /* SELF NOTE go mod init, go build, go mod tidy, go mod vendor - GO Modules project initialization*/
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"time"
 	"log"
+	"strconv"
 	"github.com/siddhant94/BidderService/config"
 	"github.com/siddhant94/BidderService/models"
 	"github.com/siddhant94/BidderService/utils"
@@ -21,17 +21,35 @@ func init() {
 func main() {
 	// Bidder Service params - delay-time, portToBind, URL (to register itself with auctioneer)
 	// 1) Number of bidders and rest system generated. (JSON, YAML etc) config file, if user-input support for all three.
-	var biddersToCreate string
+	var (
+		numOfBidders int
+		err error
+	)
 	if len(os.Args) > 1 {
-		biddersToCreate = os.Args[1]
-	} else {
-		biddersToCreate = config.GetAppConfig().DefaultBidders
+		numOfBidders, err = strconv.Atoi(os.Args[1])
+		if err != nil {
+			log.Println("Unable to convert argument as int. Picking up default value from config.")
+		}
 	}
-	fmt.Println(biddersToCreate)
+	if numOfBidders == 0 { // Since zero value of int is 0
+		numOfBidders, err = strconv.Atoi(config.GetAppConfig().DefaultBidders)
+		if err != nil {
+			log.Println("Error: string to int for default value in config. Unable to proceed")
+			return
+		}
+	}
 
 	var bidderList []*models.Bidder
-	bidderList = make([]*models.Bidder, 5, 5)
-	log.Println(bidderList)
+	bidderList = make([]*models.Bidder, numOfBidders)
 	
-	utils.Map(bidderList, utils.PopulateBidder)
+	log.Println(numOfBidders)
+	bidderList = utils.Map(bidderList, utils.PopulateBidder)
+	utils.BidderService(bidderList)
+	log.Println("main finished")
+	// select {
+	// 	case signal, ok := <-biddersSignalChan:
+	// 		if !ok {
+
+	// 		}
+	// }
 }
