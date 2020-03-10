@@ -7,6 +7,7 @@ import (
 	"time"
 	"log"
 	"strconv"
+	"os/signal"
 	"github.com/siddhant94/BidderService/config"
 	"github.com/siddhant94/BidderService/models"
 	"github.com/siddhant94/BidderService/utils"
@@ -45,11 +46,13 @@ func main() {
 	log.Println(numOfBidders)
 	bidderList = utils.Map(bidderList, utils.PopulateBidder)
 	utils.BidderService(bidderList)
-	log.Println("main finished")
-	// select {
-	// 	case signal, ok := <-biddersSignalChan:
-	// 		if !ok {
-
-	// 		}
-	// }
+	log.Println("Bidder servers up.")
+	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
+	// SIGKILL, SIGQUIT or SIGTERM (Ctrl+/) will not be caught.
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	select {
+		case <-c:
+			break
+	}
 }

@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-
-	// "net/http"
-	// "time"
+	"net/http"
+	"time"
 	"strconv"
 	"sync"
 
@@ -60,14 +59,16 @@ func BidderService(biddersList []*models.Bidder) {
 	// Wait for biddersSignalChan to fill upto buffer. 1) Can use wait groups 2) Blocking select
 	biddersSignalChan := make(chan error, len(biddersList))
 	for _, val := range biddersList {
+		serverConf := getBidderServer(val.Port)
 		wg.Add(1)
-		go startServer(biddersSignalChan)
+		startServer(serverConf, biddersSignalChan)
 	}
 	wg.Wait()
 	close(biddersSignalChan)
 	// GOTCHA: Don't range over channel without closing as then channel remains open-ended i.e. range would not know when to end
 	var failed []error
 	for elem := range biddersSignalChan {
+		fmt.Printf("%+v\n", elem)
 		if elem != nil {
 			failed = append(failed, elem)
 		}
@@ -77,26 +78,42 @@ func BidderService(biddersList []*models.Bidder) {
 	}
 }
 
-func startServer(biddersSignalChan chan<- error) {
+func startServer(serverConf *http.Server, biddersSignalChan chan<- error) {
 	defer wg.Done()
 	fmt.Println("In start server")
+	go func() {
+		if err := serverConf.ListenAndServe(); err != nil {
+			log.Println(err)
+			biddersSignalChan <- err
+		}
+	}()
 	biddersSignalChan <- nil
+	return
 }
 
-// func getBidderServer() *http.Server {
-// 	router := http.NewServeMux()
-// 	router.HandleFunc("/", bidderServerHandler)
+func getBidderServer(port string) *http.Server {
+	router := http.NewServeMux()
+	router.HandleFunc("/", bidderServerHandler)
 
-// 	server := &http.Server{
-// 		Addr:         listenAddr,
-// 		Handler:      router,
-// 		ReadTimeout:  5 * time.Second,
-// 		WriteTimeout: 10 * time.Second,
-// 		IdleTimeout:  15 * time.Second,
-// 	}
-// 	return server
-// }
+	server := &http.Server{
+		Addr:         "127.0.0.1" + port,
+		Handler:      router,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  15 * time.Second,
+	}
+	return server
+}
+// Message is response for default bidder server handler
+type Message struct {
+    Name string
+    Body string
+    Time int64
+}
 
-// func bidderServerHandler(w http.ResponseWriter, r *http.Request) {
-
-// }
+func bidderServerHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	// m := Message{"Alice", "Hello", 1294706395881547000}
+	b := []byte(`{"Name":"Alice","Body":"Hello","Time":1294706395881547000}`)
+	w.Write(b)
+}
